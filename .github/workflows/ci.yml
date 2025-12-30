@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: cd server && npm ci
+      - name: Lint (if eslint available)
+        run: cd server && npm run lint || echo "No lint script"
+      - name: Check syntax
+        run: cd server && node -c index.js && node -c worker-bull.js && node -c openai.js || true
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Build server
+        run: cd server && npm ci

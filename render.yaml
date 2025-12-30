@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: zaapar-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: APP_URL
+        fromService:
+          name: zaapar-server
+          property: host
+      - key: REDIS_HOST
+        scope: shared
+      - key: JWT_SECRET
+        scope: shared
+      - key: OPENAI_API_KEY
+        scope: shared
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: SMTP_HOST
+        scope: shared
+      - key: SMTP_PORT
+        scope: shared
+      - key: SMTP_USER
+        scope: shared
+      - key: SMTP_PASS
+        scope: shared
+
+  - type: background-worker
+    name: zaapar-worker
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm run worker
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_HOST
+        scope: shared
+      - key: REDIS_PASS
+        scope: shared
+      - key: OPENAI_API_KEY
+        scope: shared

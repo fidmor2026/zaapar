@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard - Zaapar</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <h1>Dashboard</h1>
+  <p>
+    <input id="q" placeholder="Query (optional)"/> 
+    <input id="l" placeholder="Location (optional)"/>
+    <button id="startSwipe">Start Swipe</button>
+  </p>
+  <p>Upload CV: <input id="cv" type="file"/></p>
+  <div id="status"></div>
+  <div id="swipeArea" style="max-width:600px"></div>
+
+  <script>
+    const token = localStorage.getItem('zaapar_token');
+    if (!token) { window.location.href = '/login.html'; }
+
+    document.getElementById('cv').addEventListener('change', async e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const fd = new FormData(); fd.append('cv', f);
+      document.getElementById('status').innerText = 'Uploading...';
+      const r = await fetch('/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd });
+      const j = await r.json();
+      document.getElementById('status').innerText = JSON.stringify(j);
+    });
+
+    let jobsQueue = [];
+    let currentIndex = 0;
+
+    function renderCard(job) {
+      const area = document.getElementById('swipeArea'); area.innerHTML = '';
+      if (!job) { area.innerHTML = '<p>No more jobs. Try a different query or location.</p>'; return; }
+      const d = document.createElement('div'); d.className='job'; d.style.position='relative';
+      d.innerHTML = `<h3 style="margin:0">${job.title}</h3><div style="color:#666">${job.company} — ${job.location}</div><p>${job.summary}</p><div style="position:absolute;right:12px;top:12px;font-weight:bold">Score: ${ (job.score||0).toFixed(2) }</div>`;
+      const c = document.createElement('div'); c.className='controls';
+      const like = document.createElement('button'); like.innerText='♥ Like'; like.onclick = async ()=>{ await fetch('/matches',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({job_id:job.id,decision:'like'})}); nextCard(); };
+      const dislike = document.createElement('button'); dislike.innerText='✖ Dislike'; dislike.onclick = async ()=>{ await fetch('/matches',{method:'POST',headers:{'Content-Type':'application/json',Authorization':'Bearer '+token},body:JSON.stringify({job_id:job.id,decision:'dislike'})}); nextCard(); };
+      const open = document.createElement('a'); open.href = job.link; open.target = '_blank'; open.innerText = 'Open'; open.style.marginLeft='8px';
+      c.appendChild(like); c.appendChild(dislike); c.appendChild(open);
+      d.appendChild(c);
+      area.appendChild(d);
+    }
+
+    function nextCard() {
+      currentIndex++;
+      if (currentIndex >= jobsQueue.length) renderCard(null); else renderCard(jobsQueue[currentIndex]);
+    }
+
+    document.getElementById('startSwipe').addEventListener('click', async () => {
+      document.getElementById('status').innerText = 'Loading recommendations...';
+      const q = document.getElementById('q').value || '';
+      const l = document.getElementById('l').value || '';
+      const r = await fetch(`/jobs/recommend?q=${encodeURIComponent(q)}&l=${encodeURIComponent(l)}`, { headers: { Authorization: 'Bearer ' + token } });
+      const j = await r.json();
+      jobsQueue = j.results || [];
+      currentIndex = 0;
+      document.getElementById('status').innerText = `Loaded ${jobsQueue.length} jobs`;
+      renderCard(jobsQueue[0]);
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') document.querySelector('.controls button')?.click();
+      if (e.key === 'ArrowLeft') document.querySelectorAll('.controls button')[1]?.click();
+    });
+
+    // Pointer swipe gestures for touch/mouse
+    let startX = null;
+    const area = document.getElementById('swipeArea');
+    area.addEventListener('pointerdown', e => { startX = e.clientX; });
+    area.addEventListener('pointerup', e => {
+      if (startX === null) return; const dx = e.clientX - startX; startX = null;
+      if (dx > 60) { // swipe right = like
+        document.querySelector('.controls button')?.click();
+      } else if (dx < -60) { // swipe left = dislike
+        document.querySelectorAll('.controls button')[1]?.click();
+      }
+    });
+  </script>
+</body>
+</html>
